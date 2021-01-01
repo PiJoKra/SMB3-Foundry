@@ -1,17 +1,15 @@
 from PySide2.QtCore import QRect, QSize, Qt
 from PySide2.QtGui import QColor, QPaintEvent, QPainter
-from PySide2.QtWidgets import QSizePolicy, QWidget
+from PySide2.QtWidgets import QLabel, QSizePolicy, QVBoxLayout, QWidget
 
-from foundry.game.level.Level import Level
+from foundry.game.level.LevelRef import LevelRef
 
 
 class LevelSizeBar(QWidget):
-    DEFAULT_SIZE = QSize(10, 10)
-
-    def __init__(self, parent, level):
+    def __init__(self, parent, level: LevelRef):
         super(LevelSizeBar, self).__init__(parent)
 
-        self.level: Level = level
+        self.level = level
 
         self.level.data_changed.connect(self.update)
 
@@ -28,37 +26,25 @@ class LevelSizeBar(QWidget):
             "than the level originally had)."
         )
 
-    def sizeHint(self) -> QSize:
-        size = super(LevelSizeBar, self).sizeHint()
+        self.size_bar = SizeBar(self.level)
+        self.size_bar.value_color = self.value_color
 
-        size.setHeight(self.DEFAULT_SIZE.height())
+        self.info_label = QLabel()
+        self.info_label.setAlignment(Qt.AlignCenter)
 
-        return size
+        layout = QVBoxLayout(self)
+        layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.size_bar)
+        layout.addWidget(self.info_label)
 
     def update(self):
-        self.setToolTip(f"{self.value_description}: {self.current_value}/{self.original_value} Bytes")
+        self.info_label.setText(f"{self.value_description}: {self.current_value}/{self.original_value} Bytes")
+
+        self.size_bar.current_value = self.current_value
+        self.size_bar.original_value = self.original_value
 
         return super(LevelSizeBar, self).update()
-
-    def paintEvent(self, event: QPaintEvent):
-        painter = QPainter(self)
-
-        painter.fillRect(event.rect(), self.palette().base())
-
-        if self.level is None:
-            return
-
-        total_length = max(self.current_value, self.original_value, 1)
-
-        pixels_per_byte = event.rect().width() / total_length
-
-        bar = QRect(event.rect())
-        bar.setWidth(pixels_per_byte * self.current_value)
-
-        if self.current_value > self.original_value:
-            painter.fillRect(bar, Qt.red)
-        else:
-            painter.fillRect(bar, self.value_color)
 
     @property
     def value_color(self):
@@ -75,3 +61,43 @@ class LevelSizeBar(QWidget):
     @property
     def current_value(self):
         return self.level.current_object_size()
+
+
+class SizeBar(QWidget):
+    DEFAULT_SIZE = QSize(10, 10)
+
+    def __init__(self, level_ref: LevelRef):
+        super(SizeBar, self).__init__()
+
+        self.level = level_ref
+
+        self.original_value = 1
+        self.current_value = 1
+        self.value_color = QColor.black
+
+    def sizeHint(self) -> QSize:
+        size = super(SizeBar, self).sizeHint()
+
+        size.setHeight(self.DEFAULT_SIZE.height())
+
+        return size
+
+    def paintEvent(self, event: QPaintEvent):
+        painter = QPainter(self)
+
+        painter.fillRect(event.rect(), self.palette().base())
+
+        if self.level.level is None:
+            return
+
+        total_length = max(self.current_value, self.original_value, 1)
+
+        pixels_per_byte = event.rect().width() / total_length
+
+        bar = QRect(event.rect())
+        bar.setWidth(pixels_per_byte * self.current_value)
+
+        if self.current_value > self.original_value:
+            painter.fillRect(bar, Qt.red)
+        else:
+            painter.fillRect(bar, self.value_color)

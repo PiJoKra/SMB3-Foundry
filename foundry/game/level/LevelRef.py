@@ -50,7 +50,8 @@ class LevelRef(QObject):
         if not self.undo_stack.undo_available:
             return
 
-        self._internal_level.from_bytes(*self.undo_stack.undo(), new_level=False)
+        self.level.from_bytes(*self.undo_stack.undo(), new_level=False)
+        self.level.changed = True
 
         self.data_changed.emit()
 
@@ -59,11 +60,13 @@ class LevelRef(QObject):
             return
 
         self.level.from_bytes(*self.undo_stack.redo(), new_level=False)
+        self.level.changed = True
 
         self.data_changed.emit()
 
     def save_level_state(self):
         self.undo_stack.save_level_state(self._internal_level.to_bytes())
+        self.level.changed = True
 
         self.data_changed.emit()
 

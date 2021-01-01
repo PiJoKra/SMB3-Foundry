@@ -12,6 +12,7 @@ from foundry.game.gfx.objects.LevelObjectFactory import LevelObjectFactory
 from foundry.gui.CustomChildWindow import CustomChildWindow
 from foundry.gui.LevelSelector import OBJECT_SET_ITEMS
 from foundry.gui.Spinner import Spinner
+from foundry.gui.util import clear_layout
 
 ID_SPIN_DOMAIN = 1
 ID_SPIN_TYPE = 2
@@ -63,7 +64,7 @@ class ObjectViewer(CustomChildWindow):
         self.drawing_area = ObjectDrawArea(self, 1)
 
         self.status_bar = QStatusBar(parent=self)
-        self.status_bar.showMessage(self.drawing_area.current_object.description)
+        self.status_bar.showMessage(self.drawing_area.current_object.name)
 
         self.setStatusBar(self.status_bar)
 
@@ -90,7 +91,7 @@ class ObjectViewer(CustomChildWindow):
         self.drawing_area.change_graphic_set(graphics_set)
 
         self.block_list.update_object(self.drawing_area.current_object)
-        self.status_bar.showMessage(self.drawing_area.current_object.description)
+        self.status_bar.showMessage(self.drawing_area.current_object.name)
 
     def on_object_set(self):
         object_set = self.object_set_dropdown.currentIndex() + 1
@@ -127,7 +128,7 @@ class ObjectViewer(CustomChildWindow):
 
         self.drawing_area.update()
 
-        self.status_bar.showMessage(self.drawing_area.current_object.description)
+        self.status_bar.showMessage(self.drawing_area.current_object.name)
 
     def on_spin(self, _):
         domain = self.spin_domain.value()
@@ -209,9 +210,7 @@ class BlockArray(QWidget):
     def update_object(self, level_object: LevelObject):
         self.level_object = level_object
 
-        while self.layout().count():
-            item = self.layout().takeAt(0)
-            item.widget().deleteLater()
+        clear_layout(self.layout())
 
         for block_index in self.level_object.blocks:
             block = get_block(

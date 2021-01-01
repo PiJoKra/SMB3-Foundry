@@ -12,10 +12,10 @@ from foundry.game.gfx.objects.LevelObjectFactory import LevelObjectFactory
 from foundry.game.level import LevelByteData, _load_level_offsets
 from foundry.game.level.LevelLike import LevelLike
 from foundry.gui.UndoStack import UndoStack
+from smb3parse.constants import BASE_OFFSET, Level_TilesetIdx_ByTileset
 from smb3parse.levels.level_header import LevelHeader
 
-ENEMY_POINTER_OFFSET = 0x10  # no idea why
-LEVEL_POINTER_OFFSET = 0x10010  # also no idea
+LEVEL_POINTER_OFFSET = Level_TilesetIdx_ByTileset
 
 ENEMY_SIZE = 3
 
@@ -150,8 +150,6 @@ class Level(LevelLike):
 
         self.size = self.header.width, self.header.height
 
-        self.changed = True
-
         self.data_changed.emit()
 
     def _load_enemies(self, data: bytearray):
@@ -261,7 +259,7 @@ class Level(LevelLike):
         if value == self.header.jump_enemy_address:
             return
 
-        value -= ENEMY_POINTER_OFFSET
+        value -= BASE_OFFSET
 
         self.header_bytes[2] = 0x00FF & value
         self.header_bytes[3] = value >> 8
@@ -481,7 +479,7 @@ class Level(LevelLike):
         return self.objects + self.enemies
 
     def get_object_names(self):
-        return [obj.description for obj in self.get_all_objects()]
+        return [obj.name for obj in self.get_all_objects()]
 
     def object_at(self, x: int, y: int) -> Optional[Union[EnemyObject, LevelObject]]:
         for obj in reversed(self.get_all_objects()):
@@ -596,8 +594,6 @@ class Level(LevelLike):
         obj = self.object_factory.from_properties(domain, object_index, x, y, length, index)
         self.objects.insert(index, obj)
 
-        self.changed = True
-
         return obj
 
     def add_enemy(self, object_index: int, x: int, y: int, index: int = -1) -> EnemyObject:
@@ -609,8 +605,6 @@ class Level(LevelLike):
         enemy = self.enemy_item_factory.from_data([object_index, x, y], -1)
 
         self.enemies.insert(index, enemy)
-
-        self.changed = True
 
         return enemy
 
@@ -646,8 +640,6 @@ class Level(LevelLike):
             self.objects.remove(obj)
         elif isinstance(obj, EnemyObject):
             self.enemies.remove(obj)
-
-        self.changed = True
 
     def to_m3l(self) -> bytearray:
         world_number = level_number = 1

@@ -1,5 +1,6 @@
 import json
-import pathlib
+
+from foundry import default_settings_path
 
 RESIZE_LEFT_CLICK = "LMB"
 RESIZE_RIGHT_CLICK = "RMB"
@@ -7,6 +8,7 @@ RESIZE_RIGHT_CLICK = "RMB"
 SETTINGS = dict()
 SETTINGS["instaplay_emulator"] = "fceux"
 SETTINGS["instaplay_arguments"] = "%f"
+SETTINGS["default_powerup"] = 0
 
 SETTINGS["resize_mode"] = RESIZE_LEFT_CLICK
 
@@ -17,12 +19,9 @@ SETTINGS["draw_expansion"] = False
 SETTINGS["draw_jump_on_objects"] = True
 SETTINGS["draw_items_in_blocks"] = True
 SETTINGS["draw_invisible_items"] = True
+SETTINGS["draw_autoscroll"] = False
 SETTINGS["block_transparency"] = True
-
-default_settings_dir = pathlib.Path.home() / ".smb3foundry"
-default_settings_dir.mkdir(parents=True, exist_ok=True)
-
-default_settings_path = default_settings_dir / "settings"
+SETTINGS["object_scroll_enabled"] = False
 
 
 def load_settings():

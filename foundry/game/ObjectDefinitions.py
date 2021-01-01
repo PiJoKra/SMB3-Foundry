@@ -99,6 +99,9 @@ class ObjectDefinition:
 
         self.description = self.description.split("|")[0]
 
+    def __repr__(self):
+        return f"ObjectDefinition: {self.description}"
+
 
 object_metadata: List[List[ObjectDefinition]] = [[]]
 enemy_handle_x = []
@@ -128,9 +131,9 @@ with open(data_dir.joinpath("data.dat"), "r") as f:
             else:
                 x, y, x2 = "0 0 0".split(" ")
 
-            enemy_handle_x.append(x)
-            enemy_handle_x2.append(x2)
-            enemy_handle_y.append(y)
+            enemy_handle_x.append(int(x))
+            enemy_handle_x2.append(int(x2))
+            enemy_handle_y.append(int(y))
 
         second_index += 1
 

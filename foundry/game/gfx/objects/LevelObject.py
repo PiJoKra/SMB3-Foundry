@@ -1,4 +1,5 @@
 from typing import List, Optional, Tuple, Union
+from warnings import warn
 
 from PySide2.QtCore import QRect, QSize
 from PySide2.QtGui import QImage, QPainter
@@ -7,10 +8,11 @@ from foundry.game.File import ROM
 from foundry.game.ObjectDefinitions import EndType, GeneratorType
 from foundry.game.ObjectSet import ObjectSet
 from foundry.game.gfx.GraphicsSet import GraphicsSet
-from foundry.game.gfx.Palette import bg_color_for_object_set
+from foundry.game.gfx.Palette import PaletteGroup, bg_color_for_object_set
 from foundry.game.gfx.drawable.Block import Block, get_block
 from foundry.game.gfx.objects.EnemyItem import EnemyObject
 from foundry.game.gfx.objects.ObjectLike import EXPANDS_BOTH, EXPANDS_HORIZ, EXPANDS_NOT, EXPANDS_VERT, ObjectLike
+from smb3parse.objects.object_set import PLAINS_OBJECT_SET
 
 SKY = 0
 GROUND = 27
@@ -63,6 +65,8 @@ def get_minimal_icon_object(
     if isinstance(level_object, EnemyObject):
         return level_object
 
+    level_object.ground_level = 3
+
     while (
         any(block not in level_object.rendered_blocks for block in level_object.blocks) and level_object.length < 0x10
     ):
@@ -81,7 +85,7 @@ class LevelObject(ObjectLike):
         self,
         data: bytearray,
         object_set: int,
-        palette_group,
+        palette_group: PaletteGroup,
         graphics_set: GraphicsSet,
         objects_ref: List["LevelObject"],
         is_vertical: bool,
@@ -152,7 +156,7 @@ class LevelObject(ObjectLike):
         self.height = object_data.bmp_height
         self.orientation = GeneratorType(object_data.orientation)
         self.ending = EndType(object_data.ending)
-        self.description = object_data.description
+        self.name = object_data.description
 
         self.blocks = [int(block) for block in object_data.rom_object_design]
 
@@ -190,6 +194,10 @@ class LevelObject(ObjectLike):
             self.type = self.obj_index + domain_offset
         else:
             self.type = (self.obj_index >> 4) + domain_offset + 16 - 1
+
+    @property
+    def object_info(self):
+        return self.object_set.number, self.domain, self.obj_index
 
     @property
     def length(self):
@@ -240,6 +248,8 @@ class LevelObject(ObjectLike):
 
             blocks_to_draw.extend(self.blocks[-self.width :])
 
+            new_height = self.y_position + (self.height - 1)
+
         elif self.orientation == GeneratorType.DESERT_PIPE_BOX:
             # segments are the horizontal sections, which are 8 blocks long
             # two of those are drawn per length bit
@@ -270,6 +280,9 @@ class LevelObject(ObjectLike):
                     for segment_number in range(segments):
                         blocks_to_draw.extend(self.blocks[start:stop])
 
+            # draw another last row
+            new_height += 1
+
             if is_pipe_box_type_b:
                 # draw another open row
                 start = segment_width
@@ -281,6 +294,12 @@ class LevelObject(ObjectLike):
 
             for segment_number in range(segments):
                 blocks_to_draw.extend(self.blocks[start:stop])
+
+            # every line repeats the last block again for some reason
+            for end_of_line in range(len(blocks_to_draw), 0, -new_width):
+                blocks_to_draw.insert(end_of_line, blocks_to_draw[end_of_line - 1])
+
+            new_width += 1
 
         elif self.orientation in [
             GeneratorType.DIAG_DOWN_LEFT,
@@ -331,7 +350,7 @@ class LevelObject(ObjectLike):
                 right = fill_block
             else:
                 # todo other two ends not used with diagonals?
-                print(self.description)
+                warn(f"{self.name} was not rendered.", RuntimeWarning)
                 self.rendered_blocks = []
                 return
 
@@ -355,8 +374,13 @@ class LevelObject(ObjectLike):
                     row.reverse()
 
             if self.orientation in [GeneratorType.DIAG_DOWN_RIGHT, GeneratorType.DIAG_UP_RIGHT]:
-                if not self.height > self.width:  # special case for 60 degree platform wire down right
+                if not self.height > self.width:
                     rows.reverse()
+
+            if self.orientation == GeneratorType.DIAG_DOWN_RIGHT and self.height > self.width:
+                # special case for 60 degree platform wire down right
+                for row in rows:
+                    row.reverse()
 
             if self.orientation in [GeneratorType.DIAG_UP_RIGHT]:
                 base_y -= new_height - 1
@@ -436,6 +460,12 @@ class LevelObject(ObjectLike):
                     block_position = (y_offset + y) * new_width + x + page_limit + 1
                     blocks_to_draw[block_position] = block_index
 
+            # the ending object is seemingly always 1 block too wide (going into the next screen)
+            for end_of_line in range(len(blocks_to_draw) - 1, 0, -new_width):
+                del blocks_to_draw[end_of_line]
+
+            new_width -= 1
+
             # Mushroom/Fire flower/Star is categorized as an enemy
 
         elif self.orientation == GeneratorType.VERTICAL:
@@ -449,9 +479,12 @@ class LevelObject(ObjectLike):
                     new_width = (self.obj_index & 0x0F) + 1
 
                 for _ in range(new_height):
-                    for x in range(new_width):
-                        for y in range(self.height):
-                            blocks_to_draw.append(self.blocks[x % self.width])
+                    for y in range(self.height):
+                        for x in range(new_width):
+                            blocks_to_draw.append(self.blocks[y * self.height + x % self.width])
+
+                # adjust height for giant blocks, so that the rect is correct
+                new_height *= self.height
 
             elif self.ending == EndType.END_ON_TOP_OR_LEFT:
                 # in case the drawn object is smaller than its actual size
@@ -525,6 +558,10 @@ class LevelObject(ObjectLike):
                 if self.is_single_block:
                     new_width = self.length
 
+                min_height = min(self.height, 2)
+
+                new_height = max(min_height, new_height)
+
             elif self.orientation == GeneratorType.HORIZONTAL_2 and self.ending == EndType.TWO_ENDS:
                 # floating platforms seem to just be one shorter for some reason
                 new_width -= 1
@@ -582,36 +619,62 @@ class LevelObject(ObjectLike):
                     blocks_to_draw.append(self.blocks[offset + self.width - 1])
 
             elif self.ending == EndType.TWO_ENDS:
-                top_and_bottom_line = 2
+                if self.orientation == GeneratorType.HORIZONTAL and self.is_4byte:
+                    # flat ground objects have an artificial limit of 2 lines
+                    if (
+                        self.object_set.number == PLAINS_OBJECT_SET
+                        and self.domain == 0
+                        and self.obj_index in range(0xC0, 0xE0)
+                    ):
+                        self.height = new_height = min(2, self.secondary_length + 1)
+                    else:
+                        new_height = self.secondary_length + 1
+
+                if self.width > len(self.blocks):
+                    raise ValueError(f"{self} does not provide enough blocks to fill a row.")
+                else:
+                    start = 0
+                    end = self.width
 
                 for y in range(self.height):
-                    offset = y * self.width
-                    left, *middle, right = self.blocks[offset : offset + self.width]
+                    new_start = y * self.width
+                    new_end = (y + 1) * self.width
+
+                    if new_end > len(self.blocks):
+                        # repeat the last line of blocks to fill the object
+                        pass
+                    else:
+                        start = new_start
+                        end = new_end
+
+                    left, *middle, right = self.blocks[start:end]
 
                     blocks_to_draw.append(left)
-                    blocks_to_draw.extend(middle * (new_width - top_and_bottom_line))
+                    blocks_to_draw.extend(middle * (new_width - 2))
                     blocks_to_draw.append(right)
 
                 if not len(blocks_to_draw) % self.height == 0:
-                    print(f"Blocks to draw are not divisible by height. {self}")
+                    warn(f"Blocks to draw are not divisible by height. {self}", RuntimeWarning)
 
                 new_width = int(len(blocks_to_draw) / self.height)
 
                 top_row = blocks_to_draw[0:new_width]
+                middle_blocks = blocks_to_draw[new_width : new_width * 2]
                 bottom_row = blocks_to_draw[-new_width:]
 
-                middle_blocks = blocks_to_draw[new_width:-new_width]
+                blocks_to_draw = top_row
 
-                new_rows = new_height - top_and_bottom_line
+                for y in range(1, new_height - 1):
+                    blocks_to_draw.extend(middle_blocks)
 
-                if new_rows >= 0:
-                    blocks_to_draw = top_row + middle_blocks * new_rows + bottom_row
+                if new_height > 1:
+                    blocks_to_draw.extend(bottom_row)
         else:
             if not self.orientation == GeneratorType.SINGLE_BLOCK_OBJECT:
-                print(f"Didn't render {self.description}")
+                warn(f"Didn't render {self.name}", RuntimeWarning)
                 # breakpoint()
 
-            if self.description.lower() == "black boss room background":
+            if self.name.lower() == "black boss room background":
                 new_width = SCREEN_WIDTH
                 new_height = SCREEN_HEIGHT
 
@@ -632,16 +695,18 @@ class LevelObject(ObjectLike):
         self.rendered_base_y = base_y
 
         if new_width and not self.rendered_height == len(self.rendered_blocks) / new_width:
-            print(
-                f"Not enough Blocks for calculated height: {self.description}. "
-                f"Blocks for height: {len(self.rendered_blocks) / new_width}. Rendered height: {self.rendered_height}"
+            warn(
+                f"Not enough Blocks for calculated height: {self.name}. "
+                f"Blocks for height: {len(self.rendered_blocks) / new_width}. Rendered height: {self.rendered_height}",
+                RuntimeWarning,
             )
 
             self.rendered_height = len(self.rendered_blocks) / new_width
         elif new_width == 0:
-            print(
-                f"Calculated Width is 0, setting to 1: {self.description}. "
-                f"Blocks to draw: {len(self.rendered_blocks)}. Rendered height: {self.rendered_height}"
+            warn(
+                f"Calculated Width is 0, setting to 1: {self.name}. "
+                f"Blocks to draw: {len(self.rendered_blocks)}. Rendered height: {self.rendered_height}",
+                RuntimeWarning,
             )
 
             self.rendered_width = 1
@@ -674,7 +739,11 @@ class LevelObject(ObjectLike):
     def set_position(self, x, y):
         # todo also check for the upper bounds
         x = max(0, x)
-        y = max(0, y)
+
+        if self.orientation == GeneratorType.TO_THE_SKY:
+            y = self.rendered_base_y + y
+        else:
+            y = max(0, y)
 
         x_diff = self.x_position - self.rendered_base_x
         y_diff = self.y_position - self.rendered_base_y
@@ -920,7 +989,7 @@ class LevelObject(ObjectLike):
         return data
 
     def __repr__(self) -> str:
-        return f"LevelObject {self.description} at {self.x_position}, {self.y_position}"
+        return f"LevelObject {self.name} at {self.x_position}, {self.y_position}"
 
     def __eq__(self, other):
         if not isinstance(other, LevelObject):

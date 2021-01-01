@@ -3,7 +3,7 @@ from PySide2.QtGui import QColor, QImage, QPainter, Qt
 
 from foundry.game.ObjectDefinitions import enemy_handle_x, enemy_handle_x2, enemy_handle_y
 from foundry.game.ObjectSet import ObjectSet
-from foundry.game.gfx.Palette import NESPalette
+from foundry.game.gfx.Palette import NESPalette, PaletteGroup
 from foundry.game.gfx.GraphicsSet import GraphicsSet
 from foundry.game.gfx.drawable import apply_selection_overlay
 from foundry.game.gfx.drawable.Block import Block
@@ -14,7 +14,7 @@ MASK_COLOR = [0xFF, 0x33, 0xFF]
 
 
 class EnemyObject(ObjectLike):
-    def __init__(self, data, png_data, palette_group):
+    def __init__(self, data, png_data, palette_group: PaletteGroup):
         super(EnemyObject, self).__init__()
 
         self.is_4byte = False
@@ -22,7 +22,7 @@ class EnemyObject(ObjectLike):
         self.length = 0
 
         self.obj_index = data[0]
-        self.x_position = data[1] - int(enemy_handle_x2[self.obj_index])
+        self.x_position = data[1] - enemy_handle_x2[self.obj_index]
         self.y_position = data[2]
 
         self.domain = 0
@@ -36,21 +36,26 @@ class EnemyObject(ObjectLike):
 
         self.png_data = png_data
 
-        self.rect = QRect()
-
         self.selected = False
 
         self._setup()
 
+    @property
+    def rect(self):
+        return QRect(
+            self.x_position + enemy_handle_x[self.obj_index],
+            self.y_position + enemy_handle_y[self.obj_index],
+            self.width,
+            self.height,
+        )
+
     def _setup(self):
         obj_def = self.object_set.get_definition_of(self.obj_index)
 
-        self.description = obj_def.description
+        self.name = obj_def.description
 
         self.width = obj_def.bmp_width
         self.height = obj_def.bmp_height
-
-        self.rect = QRect(self.x_position, self.y_position, self.width, self.height)
 
         self._render(obj_def)
 
@@ -74,8 +79,8 @@ class EnemyObject(ObjectLike):
             x = self.x_position + (i % self.width)
             y = self.y_position + (i // self.width)
 
-            x_offset = int(enemy_handle_x[self.obj_index])
-            y_offset = int(enemy_handle_y[self.obj_index])
+            x_offset = enemy_handle_x[self.obj_index]
+            y_offset = enemy_handle_y[self.obj_index]
 
             x += x_offset
             y += y_offset
@@ -95,7 +100,7 @@ class EnemyObject(ObjectLike):
             painter.drawImage(x * block_length, y * block_length, block)
 
     def get_status_info(self):
-        return [("Name", self.description), ("X", self.x_position), ("Y", self.y_position)]
+        return [("Name", self.name), ("X", self.x_position), ("Y", self.y_position)]
 
     def __contains__(self, item):
         x, y = item
@@ -112,8 +117,6 @@ class EnemyObject(ObjectLike):
 
         self.x_position = x
         self.y_position = y
-
-        self.rect = QRect(self.x_position, self.y_position, self.width, self.height)
 
     def move_by(self, dx, dy):
         new_x = self.x_position + dx
@@ -160,5 +163,8 @@ class EnemyObject(ObjectLike):
 
         return image
 
+    def __str__(self):
+        return f"{self.name} at {self.x_position}, {self.y_position}"
+
     def __repr__(self):
-        return f"EnemyObject {self.description} at {self.x_position}, {self.y_position}"
+        return f"EnemyObject: {self}"
