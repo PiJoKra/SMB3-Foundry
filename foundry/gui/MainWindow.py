@@ -42,6 +42,7 @@ from foundry.game.level.LevelRef import LevelRef
 from foundry.game.level.WorldMap import WorldMap
 from foundry.gui.AboutWindow import AboutDialog
 from foundry.gui.AutoScrollEditor import AutoScrollEditor
+from foundry.gui.AutoScrollEditorToolBar import AutoScrollEditorToolBar
 from foundry.gui.BlockViewer import BlockViewer
 from foundry.gui.ContextMenu import CMAction, ContextMenu
 from foundry.gui.EnemySizeBar import EnemySizeBar
@@ -296,6 +297,17 @@ class MainWindow(QMainWindow):
         self.scroll_panel.setWidget(self.level_view)
 
         self.setCentralWidget(self.scroll_panel)
+
+        self.autoScrollEditor_toolbar = AutoScrollEditorToolBar(self.level_ref)
+        autoScrollEditor_toolbar = QToolBar("AutoScrollEditor Toolbar", self)
+        autoScrollEditor_toolbar.setContextMenuPolicy(Qt.PreventContextMenu)
+        autoScrollEditor_toolbar.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
+        autoScrollEditor_toolbar.setFloatable(False)
+
+        autoScrollEditor_toolbar.addWidget(self.autoScrollEditor_toolbar)
+        autoScrollEditor_toolbar.setAllowedAreas(Qt.LeftToolBarArea | Qt.RightToolBarArea)
+
+        self.addToolBar(Qt.BottomToolBarArea, autoScrollEditor_toolbar)
 
         self.spinner_panel = SpinnerPanel(self, self.level_ref)
         self.spinner_panel.zoom_in_triggered.connect(self.level_view.zoom_in)
@@ -1071,6 +1083,7 @@ class MainWindow(QMainWindow):
             self.object_list,
             self.jump_list,
             self.object_toolbar,
+            self.autoScrollEditor_toolbar
         ]
 
         level_elements.extend(self.level_menu.actions())
