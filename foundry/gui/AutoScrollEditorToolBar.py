@@ -1,16 +1,16 @@
-
 from typing import List, Optional
-from PySide2.QtCore import Qt, Signal, SignalInstance
-from PySide2.QtWidgets import QCheckBox, QLabel, QVBoxLayout, QGroupBox, QWidget
+from PySide2.QtCore import Signal, SignalInstance
+from PySide2.QtWidgets import QCheckBox, QLabel, QVBoxLayout, QWidget
 
 from foundry.game.gfx.objects.EnemyItem import EnemyObject
 from foundry.game.level.LevelRef import LevelRef
 from foundry.game.gfx.objects.ObjectLike import ObjectLike
 
-from foundry.gui.CustomDialog import CustomDialog
+# from foundry.gui.CustomDialog import CustomDialog
 from foundry.gui.Spinner import Spinner
-from foundry.gui.ObjectToolBox import ObjectIcon
-from foundry.gui.TabbedToolBox import TabbedToolBox
+
+# from foundry.gui.ObjectToolBox import ObjectIcon
+# from foundry.gui.TabbedToolBox import TabbedToolBox
 
 from smb3parse.constants import OBJ_AUTOSCROLL
 
@@ -24,6 +24,7 @@ AUTOSCROLL_LABELS = {
     4: "Moves Level (except bottom two rows) down until the ceiling and the floor of the level are both on screen",
     5: "Moves Level (except bottom two rows) up and down, used for changes in over-water Levels",
 }
+
 
 class AutoScrollEditorToolBar(QWidget):
     object_selected: SignalInstance = Signal(ObjectLike)
@@ -99,7 +100,7 @@ class AutoScrollEditorToolBar(QWidget):
             ):
                 self.level_ref.save_level_state()
 
-        super(AutoScrollEditor, self).closeEvent(event)
+        super(AutoScrollEditorToolBar, self).closeEvent(event)
 
 
 def _get_autoscroll(enemy_items: List[EnemyObject]) -> Optional[EnemyObject]:

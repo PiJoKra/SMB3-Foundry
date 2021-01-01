@@ -1083,7 +1083,7 @@ class MainWindow(QMainWindow):
             self.object_list,
             self.jump_list,
             self.object_toolbar,
-            self.autoScrollEditor_toolbar
+            self.autoScrollEditor_toolbar,
         ]
 
         level_elements.extend(self.level_menu.actions())
